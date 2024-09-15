@@ -152,7 +152,7 @@ struct queue_item {
                 const uint64_t take = max(                                         \
                     rbq_used(&target->queue_name) * ctx->steal.num / ctx->steal.denom,   \
                     1);                                                            \
-                rbq_append_n(&tw->waiting, &target->queue_name, take);           \
+                rbq_append_n(&tw->claimed, &target->queue_name, take);           \
                 pthread_mutex_unlock(&target->mutex_name);                         \
                 rc = rbq_used(&tw->waiting);                                             \
                 break;                                                             \
@@ -219,10 +219,12 @@ static void maybe_steal_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw, size_t id)
      * do this to always start searching from different locations
      */
     (void) (
+/*
         (steal_waiting( ctx, id, tw->steal_from, ctx->nthreads)  == 0) &&
         (steal_waiting( ctx, id, 0,              tw->steal_from) == 0) &&
         (steal_deferred(ctx, id, tw->steal_from, ctx->nthreads)  == 0) &&
         (steal_deferred(ctx, id, 0,              tw->steal_from) == 0) &&
+*/
         /*
          * if still can't find anything, try the claimed queue
          *
@@ -245,13 +247,14 @@ static void wait_for_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw) {
     while (
         /* running, but no work in pool or current thread */
         ((ctx->state == RUNNING) && (!ctx->incomplete ||
-                                     (!rbq_used(&tw->waiting) && !rbq_used(&tw->deferred)))) ||
+                                     (!rbq_used(&tw->waiting) && !rbq_used(&tw->deferred)
+                                        && !rbq_used(&tw->claimed)))) ||
         /*
          * not running and still have work in
          * other threads, just not this one
          */
         ((ctx->state == STOPPING) && ctx->incomplete &&
-         !rbq_used(&tw->waiting)&& !rbq_used(&tw->deferred))
+         !rbq_used(&tw->waiting) && !rbq_used(&tw->deferred) && !rbq_used(&tw->claimed))
         ) {
         pthread_mutex_unlock(&ctx->mutex);
         pthread_cond_wait(&tw->cv, &tw->mutex);
@@ -334,7 +337,7 @@ static size_t process_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw, size_t id) {
 
         timestamp_create_start(wf_next_work);
         pthread_mutex_lock(&tw->claimed_mutex);
-        qi = (struct queue_item *) rbq_pop_head(&tw->claimed);
+        qi = (struct queue_item *) rbq_pop_tail(&tw->claimed);
         pthread_mutex_unlock(&tw->claimed_mutex);
         timestamp_end_print(ctx->debug_buffers, id, "wf_next_work", wf_next_work);
 
@@ -381,9 +384,11 @@ static void *worker_function(void *args) {
         pthread_mutex_unlock(&ctx->mutex);
         /* tw->mutex still locked */
 
+/*
         timestamp_create_start(wf_move_queue);
         claim_work(tw);
         timestamp_set_end(wf_move_queue);
+*/
 
         #if defined(DEBUG) && defined (QPTPOOL_QUEUE_SIZE)
         dump_queue_size_stats(ctx, tw);
@@ -718,11 +723,13 @@ QPTPool_enqueue_dst_t QPTPool_enqueue(QPTPool_t *ctx, const size_t id, QPTPoolFu
 
     pthread_mutex_lock(&next->mutex);
     if (!ctx->queue_limit || (rbq_used(&next->waiting) < ctx->queue_limit)) {
-        rbq_push_tail(&next->waiting, qi);
+        // rbq_push_tail(&next->waiting, qi);
+        rbq_push_tail(&next->claimed, qi);
         ret = QPTPool_enqueue_WAIT;
     }
     else {
-        rbq_push_tail(&next->deferred, qi);
+        // rbq_push_tail(&next->deferred, qi);
+        rbq_push_tail(&next->claimed, qi);
         ret = QPTPool_enqueue_DEFERRED;
     }
 
