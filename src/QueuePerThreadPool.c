@@ -322,7 +322,7 @@ static size_t process_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw, size_t id) {
      */
     timestamp_create_start(wf_get_queue_head);
     pthread_mutex_lock(&tw->claimed_mutex);
-    struct queue_item *qi = (struct queue_item *) rbq_pop(&tw->claimed);
+    struct queue_item *qi = (struct queue_item *) rbq_pop_tail(&tw->claimed);
     pthread_mutex_unlock(&tw->claimed_mutex);
     timestamp_end_print(ctx->debug_buffers, id, "wf_get_queue_head", wf_get_queue_head);
 
@@ -334,7 +334,7 @@ static size_t process_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw, size_t id) {
 
         timestamp_create_start(wf_next_work);
         pthread_mutex_lock(&tw->claimed_mutex);
-        qi = (struct queue_item *) rbq_pop(&tw->claimed);
+        qi = (struct queue_item *) rbq_pop_head(&tw->claimed);
         pthread_mutex_unlock(&tw->claimed_mutex);
         timestamp_end_print(ctx->debug_buffers, id, "wf_next_work", wf_next_work);
 
@@ -718,11 +718,11 @@ QPTPool_enqueue_dst_t QPTPool_enqueue(QPTPool_t *ctx, const size_t id, QPTPoolFu
 
     pthread_mutex_lock(&next->mutex);
     if (!ctx->queue_limit || (rbq_used(&next->waiting) < ctx->queue_limit)) {
-        rbq_push(&next->waiting, qi);
+        rbq_push_tail(&next->waiting, qi);
         ret = QPTPool_enqueue_WAIT;
     }
     else {
-        rbq_push(&next->deferred, qi);
+        rbq_push_tail(&next->deferred, qi);
         ret = QPTPool_enqueue_DEFERRED;
     }
 
@@ -753,10 +753,10 @@ QPTPool_enqueue_dst_t QPTPool_enqueue_here(QPTPool_t *ctx, const size_t id, QPTP
 
     pthread_mutex_lock(&data->mutex);
     if (queue == QPTPool_enqueue_WAIT) {
-        rbq_push(&data->waiting, qi);
+        rbq_push_tail(&data->waiting, qi);
     }
     else if (queue == QPTPool_enqueue_DEFERRED) {
-        rbq_push(&data->deferred, qi);
+        rbq_push_tail(&data->deferred, qi);
     }
 
     pthread_mutex_lock(&ctx->mutex);

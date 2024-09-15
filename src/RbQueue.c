@@ -97,7 +97,7 @@ static void rbq_grow(struct rbq *q) {
 
 }
 
-void rbq_push(struct rbq *q, void *data) {
+void rbq_push_tail(struct rbq *q, void *data) {
     size_t old_tail = q->tail;  /* First free slot. */
 
     size_t new_tail = (q->tail + 1) % q->capacity;
@@ -114,7 +114,7 @@ void rbq_push(struct rbq *q, void *data) {
     q->tail = new_tail;
 }
 
-void *rbq_pop(struct rbq *q) {
+void *rbq_pop_head(struct rbq *q) {
     /* Queue empty: */
     if (q->head == q->tail) {
         return NULL;
@@ -128,6 +128,24 @@ void *rbq_pop(struct rbq *q) {
 
     size_t new_head = (q->head + 1) % q->capacity;
     q->head = new_head;
+    return data;
+}
+
+void *rbq_pop_tail(struct rbq *q) {
+    /* Queue empty: */
+    if (q->head == q->tail) {
+        return NULL;
+    }
+
+    size_t new_tail = q->tail > 0 ? q->tail - 1 : q->capacity - 1;
+
+    void *data = q->data[new_tail];
+    if (!data)
+        panic("Tried to pop an empty slot.");
+
+    q->data[new_tail] = NULL;
+
+    q->tail = new_tail;
     return data;
 }
 

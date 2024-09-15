@@ -26,8 +26,9 @@ void rbq_init(struct rbq *q);
 void rbq_destroy(struct rbq *q);
 void rbq_exit(struct rbq *q);
 
-void rbq_push(struct rbq *q, void * data);
-void *rbq_pop(struct rbq *q);
+void rbq_push_tail(struct rbq *q, void * data);
+void *rbq_pop_head(struct rbq *q);
+void *rbq_pop_tail(struct rbq *q);
 
 size_t rbq_avail(struct rbq *q);
 size_t rbq_used(struct rbq *q);
