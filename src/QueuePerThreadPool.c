@@ -192,7 +192,8 @@ static uint64_t steal_deferred(QPTPool_t *ctx, const size_t id,
 static uint64_t steal_claimed(QPTPool_t *ctx, const size_t id,
                               const size_t start, const size_t end) {
     uint64_t rc = 0;
-    steal(ctx, id, start, end, claimed_mutex, claimed, rc);
+    // steal(ctx, id, start, end, claimed_mutex, claimed, rc);
+    steal(ctx, id, start, end, mutex, claimed, rc);
     return rc;
 }
 
@@ -324,9 +325,9 @@ static size_t process_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw, size_t id) {
      *     lower memory utilization
      */
     timestamp_create_start(wf_get_queue_head);
-    pthread_mutex_lock(&tw->claimed_mutex);
+    pthread_mutex_lock(&tw->mutex);
     struct queue_item *qi = (struct queue_item *) rbq_pop_tail(&tw->claimed);
-    pthread_mutex_unlock(&tw->claimed_mutex);
+    pthread_mutex_unlock(&tw->mutex);
     timestamp_end_print(ctx->debug_buffers, id, "wf_get_queue_head", wf_get_queue_head);
 
     while (qi) {
@@ -336,9 +337,9 @@ static size_t process_work(QPTPool_t *ctx, QPTPoolThreadData_t *tw, size_t id) {
         timestamp_end_print(ctx->debug_buffers, id, "wf_process_work", wf_process_work);
 
         timestamp_create_start(wf_next_work);
-        pthread_mutex_lock(&tw->claimed_mutex);
+        pthread_mutex_lock(&tw->mutex);
         qi = (struct queue_item *) rbq_pop_tail(&tw->claimed);
-        pthread_mutex_unlock(&tw->claimed_mutex);
+        pthread_mutex_unlock(&tw->mutex);
         timestamp_end_print(ctx->debug_buffers, id, "wf_next_work", wf_next_work);
 
         work_count++; /* increment for previous work item */
@@ -383,12 +384,6 @@ static void *worker_function(void *args) {
 
         pthread_mutex_unlock(&ctx->mutex);
         /* tw->mutex still locked */
-
-/*
-        timestamp_create_start(wf_move_queue);
-        claim_work(tw);
-        timestamp_set_end(wf_move_queue);
-*/
 
         #if defined(DEBUG) && defined (QPTPOOL_QUEUE_SIZE)
         dump_queue_size_stats(ctx, tw);
@@ -715,8 +710,9 @@ QPTPool_enqueue_dst_t QPTPool_enqueue(QPTPool_t *ctx, const size_t id, QPTPoolFu
     pthread_mutex_lock(&data->mutex);
     QPTPoolThreadData_t *next = &ctx->data[data->next_queue];
     /* have to calculate next_queue before new_work is modified */
-    data->next_queue = ctx->next.func(id, data->next_queue, ctx->nthreads,
-                                      new_work, ctx->next.args);
+    // data->next_queue = ctx->next.func(id, data->next_queue, ctx->nthreads,
+                                      // new_work, ctx->next.args);
+    data->next_queue = id;
     pthread_mutex_unlock(&data->mutex);
 
     QPTPool_enqueue_dst_t ret = QPTPool_enqueue_ERROR;

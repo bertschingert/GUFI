@@ -104,7 +104,7 @@ static int process_external(struct input *in, void *args,
 }
 
 static int process_nondir(struct work *entry, struct entry_data *ed, void *args) {
-    printf("%s\n", entry->name);
+    // printf("%s\n", entry->name);
     struct NondirArgs *nda = (struct NondirArgs *) args;
     if (!ed->lstat_called) {
         char *basename = entry->name + entry->name_len - entry->basename_len;
@@ -145,7 +145,7 @@ static int processdir(QPTPool_t *ctx, const size_t id, void *data, void *args) {
         decompress_struct((void **) &work, data, sizeof(work_src));
     }
 
-    printf("%s\n", work->name);
+    // printf("%s\n", work->name);
     DIR *dir = opendir(work->name);
     if (!dir) {
         rc = 1;
